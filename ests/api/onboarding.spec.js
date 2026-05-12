@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { gerarMassaDeDadosRegistro, isGeminiConfigured } = require('../../utils/ai-helper');
+const { obterCenariosRegistro, isGeminiConfigured } = require('../../utils/ai-helper');
 
 test.describe('API - Fluxo de Registro guiado por Google Gemini', () => {
 
@@ -9,8 +9,8 @@ test.describe('API - Fluxo de Registro guiado por Google Gemini', () => {
       'GEMINI_API_KEY não definida: defina no .env ou no secret GEMINI_API_KEY no GitHub Actions (403 sem chave).'
     );
 
-    // 1. Pede à IA para inventar os dados de teste
-    const cenariosGerados = await gerarMassaDeDadosRegistro();
+    // 1. IA gera cenários; em 429 (quota) usa fallback estável (ver utils/ai-helper.js)
+    const cenariosGerados = await obterCenariosRegistro();
     expect(cenariosGerados.length).toBeGreaterThan(0);
 
     // 2. Itera sobre cada cenário e ataca a API

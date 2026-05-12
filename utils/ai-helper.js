@@ -27,6 +27,40 @@ function getGeminiModelId() {
   return id || "gemini-2.0-flash";
 }
 
+/** Cenários estáveis (documentação reqres.in) quando Gemini falha por quota (429). */
+const CENARIOS_REGISTRO_FALLBACK = [
+  {
+    titulo: "[fallback] Registro válido (usuário demo)",
+    email: "eve.holt@reqres.in",
+    password: "pistol",
+    statusCodeEsperado: 200,
+  },
+  {
+    titulo: "[fallback] Senha ausente",
+    email: "eve.holt@reqres.in",
+    password: "",
+    statusCodeEsperado: 400,
+  },
+  {
+    titulo: "[fallback] Usuário não listado na demo",
+    email: "sydney@fife",
+    password: "pistol",
+    statusCodeEsperado: 400,
+  },
+];
+
+function isGeminiQuotaOrRateLimitError(error) {
+  if (!error) return false;
+  if (error.status === 429 || error.statusCode === 429) return true;
+  const text = `${error.message || ""} ${error.statusText || ""}`;
+  return /429|quota exceeded|rate.?limit|resource_exhausted/i.test(text);
+}
+
+function isGeminiStrict() {
+  const v = process.env.GEMINI_STRICT?.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
 async function gerarMassaDeDadosRegistro() {
   try {
     const genAI = createGenAI();
@@ -49,4 +83,27 @@ async function gerarMassaDeDadosRegistro() {
   }
 }
 
-module.exports = { gerarMassaDeDadosRegistro, isGeminiConfigured };
+/**
+ * Tenta gerar cenários com Gemini; em quota/rate limit (429) devolve cenários fixos
+ * para o pipeline não falhar (ver https://ai.google.dev/gemini-api/docs/rate-limits ).
+ * Com GEMINI_STRICT=1, 429 propaga erro (CI falha até haver quota).
+ */
+async function obterCenariosRegistro() {
+  try {
+    return await gerarMassaDeDadosRegistro();
+  } catch (error) {
+    if (!isGeminiStrict() && isGeminiQuotaOrRateLimitError(error)) {
+      console.warn(
+        "[Gemini] Quota ou limite de taxa; usando CENARIOS_REGISTRO_FALLBACK. Defina GEMINI_STRICT=1 para falhar em 429."
+      );
+      return CENARIOS_REGISTRO_FALLBACK;
+    }
+    throw error;
+  }
+}
+
+module.exports = {
+  gerarMassaDeDadosRegistro,
+  obterCenariosRegistro,
+  isGeminiConfigured,
+};
