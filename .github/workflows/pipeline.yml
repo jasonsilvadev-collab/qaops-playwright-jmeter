@@ -24,12 +24,13 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
           
-      # Sem o secret GEMINI_API_KEY o job ainda passa: o teste que chama Gemini é ignorado (test.skip).
-      # Crie a chave em https://aistudio.google.com/apikey e adicione em Repo → Settings → Secrets → Actions.
+      # REQRES_API_KEY: obrigatório — reqres.in exige x-api-key (https://app.reqres.in/api-keys).
+      # GEMINI_API_KEY: opcional — sem ela os testes usam cenários fixos em vez da IA.
       - name: Executar Playwright + Gemini
         run: npx playwright test
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          REQRES_API_KEY: ${{ secrets.REQRES_API_KEY }}
 
   jmeter-load-tests:
     runs-on: ubuntu-latest
@@ -45,9 +46,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends jmeter
 
-      # Carga menor no CI (threads/loops via -J); produção pode usar valores default do .jmx.
+      - name: Checar REQRES_API_KEY (obrigatório para JMeter)
+        run: |
+          if [ -z "${REQRES_API_KEY:-}" ]; then
+            echo "::error::Defina o secret REQRES_API_KEY (https://app.reqres.in/api-keys)."
+            exit 1
+          fi
+        env:
+          REQRES_API_KEY: ${{ secrets.REQRES_API_KEY }}
+
+      # Carga menor no CI (threads/loops via -J); -JreqresApiKey alinha com Playwright (secret REQRES_API_KEY).
       - name: Executar Teste de Performance (JMeter em modo non-GUI)
-        run: jmeter -n -t performance/load-test.jmx -l performance/results.jtl -Jthreads=5 -Jloops=2
+        run: jmeter -n -t performance/load-test.jmx -l performance/results.jtl -Jthreads=5 -Jloops=2 -JreqresApiKey="${REQRES_API_KEY}"
+        env:
+          REQRES_API_KEY: ${{ secrets.REQRES_API_KEY }}
 
       - name: Salvar Relatório de Performance
         uses: actions/upload-artifact@v4

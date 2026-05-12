@@ -11,20 +11,14 @@ function isGeminiConfigured() {
   return Boolean(getGeminiApiKey());
 }
 
-function createGenAI() {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    throw new Error(
-      "GEMINI_API_KEY ausente. Local: defina em .env. CI: Settings → Secrets → Actions → GEMINI_API_KEY (chave em https://aistudio.google.com/apikey)."
-    );
-  }
-  return new GoogleGenerativeAI(apiKey);
+function getReqresApiKey() {
+  const key = process.env.REQRES_API_KEY?.trim();
+  return key || "";
 }
 
-/** IDs válidos mudam no tempo; override opcional via GEMINI_MODEL. */
-function getGeminiModelId() {
-  const id = process.env.GEMINI_MODEL?.trim();
-  return id || "gemini-2.0-flash";
+/** Reqres passou a exigir header x-api-key (https://app.reqres.in/api-keys). */
+function isReqresConfigured() {
+  return Boolean(getReqresApiKey());
 }
 
 /** Cenários estáveis (documentação reqres.in) quando Gemini falha por quota (429). */
@@ -48,6 +42,26 @@ const CENARIOS_REGISTRO_FALLBACK = [
     statusCodeEsperado: 400,
   },
 ];
+
+function cenariosRegistroFallbackCopia() {
+  return CENARIOS_REGISTRO_FALLBACK.map((c) => ({ ...c }));
+}
+
+function createGenAI() {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY ausente. Local: defina em .env. CI: Settings → Secrets → Actions → GEMINI_API_KEY (chave em https://aistudio.google.com/apikey)."
+    );
+  }
+  return new GoogleGenerativeAI(apiKey);
+}
+
+/** IDs válidos mudam no tempo; override opcional via GEMINI_MODEL. */
+function getGeminiModelId() {
+  const id = process.env.GEMINI_MODEL?.trim();
+  return id || "gemini-2.0-flash";
+}
 
 function isGeminiQuotaOrRateLimitError(error) {
   if (!error) return false;
@@ -84,11 +98,13 @@ async function gerarMassaDeDadosRegistro() {
 }
 
 /**
- * Tenta gerar cenários com Gemini; em quota/rate limit (429) devolve cenários fixos
- * para o pipeline não falhar (ver https://ai.google.dev/gemini-api/docs/rate-limits ).
- * Com GEMINI_STRICT=1, 429 propaga erro (CI falha até haver quota).
+ * Sem GEMINI_API_KEY: só cenários fixos (smoke). Com Gemini: gera JSON; em 429 usa fallback
+ * (https://ai.google.dev/gemini-api/docs/rate-limits ). GEMINI_STRICT=1 faz 429 falhar.
  */
 async function obterCenariosRegistro() {
+  if (!isGeminiConfigured()) {
+    return cenariosRegistroFallbackCopia();
+  }
   try {
     return await gerarMassaDeDadosRegistro();
   } catch (error) {
@@ -96,7 +112,7 @@ async function obterCenariosRegistro() {
       console.warn(
         "[Gemini] Quota ou limite de taxa; usando CENARIOS_REGISTRO_FALLBACK. Defina GEMINI_STRICT=1 para falhar em 429."
       );
-      return CENARIOS_REGISTRO_FALLBACK;
+      return cenariosRegistroFallbackCopia();
     }
     throw error;
   }
@@ -106,4 +122,5 @@ module.exports = {
   gerarMassaDeDadosRegistro,
   obterCenariosRegistro,
   isGeminiConfigured,
+  isReqresConfigured,
 };

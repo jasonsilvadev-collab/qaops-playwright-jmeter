@@ -1,16 +1,19 @@
 const { test, expect } = require('@playwright/test');
-const { obterCenariosRegistro, isGeminiConfigured } = require('../../utils/ai-helper');
+const { obterCenariosRegistro, isGeminiConfigured, isReqresConfigured } = require('../../utils/ai-helper');
 
 test.describe('API - Fluxo de Registro guiado por Google Gemini', () => {
 
   test('Deve testar dinamicamente os cenários de IA na API reqres.in', async ({ request }) => {
     test.skip(
-      !isGeminiConfigured(),
-      'GEMINI_API_KEY não definida: defina no .env ou no secret GEMINI_API_KEY no GitHub Actions (403 sem chave).'
+      !isReqresConfigured(),
+      'REQRES_API_KEY ausente: a API pública exige x-api-key. Crie em https://app.reqres.in/api-keys e defina no .env ou secret REQRES_API_KEY no GitHub Actions.'
     );
 
-    // 1. IA gera cenários; em 429 (quota) usa fallback estável (ver utils/ai-helper.js)
+    // 1. Com GEMINI_API_KEY: IA gera cenários; sem Gemini ou em 429: fallback (utils/ai-helper.js)
     const cenariosGerados = await obterCenariosRegistro();
+    if (!isGeminiConfigured()) {
+      console.log('\n[INFO] Sem GEMINI_API_KEY — a executar cenários fixos (smoke).');
+    }
     expect(cenariosGerados.length).toBeGreaterThan(0);
 
     // 2. Itera sobre cada cenário e ataca a API
