@@ -65,9 +65,24 @@ function getGeminiModelId() {
 
 function isGeminiQuotaOrRateLimitError(error) {
   if (!error) return false;
-  if (error.status === 429 || error.statusCode === 429) return true;
-  const text = `${error.message || ""} ${error.statusText || ""}`;
-  return /429|quota exceeded|rate.?limit|resource_exhausted/i.test(text);
+  const status = error.status ?? error.statusCode;
+  if (status === 429 || status === 503) return true;
+  const details = Array.isArray(error.errorDetails)
+    ? JSON.stringify(error.errorDetails)
+    : "";
+  const text = `${error.message || ""} ${error.statusText || ""} ${details}`;
+  // Free tier "limit: 0", quota metrics, 403 consumer suspended, etc.
+  if (
+    status === 403 &&
+    /quota|rate|limit:\s*0|resource_exhausted|consumer|billing|permission/i.test(text)
+  ) {
+    return true;
+  }
+  return (
+    /quota exceeded|exceeded your (current )?quota|limit:\s*0|free_tier|RESOURCE_EXHAUSTED|resource_exhausted|rate.?limit|generativelanguage\.googleapis\.com\/generate_content/i.test(
+      text
+    )
+  );
 }
 
 function isGeminiStrict() {
@@ -98,8 +113,9 @@ async function gerarMassaDeDadosRegistro() {
 }
 
 /**
- * Sem GEMINI_API_KEY: só cenários fixos (smoke). Com Gemini: gera JSON; em 429 usa fallback
- * (https://ai.google.dev/gemini-api/docs/rate-limits ). GEMINI_STRICT=1 faz 429 falhar.
+ * Sem GEMINI_API_KEY: só cenários fixos (smoke). Com Gemini: gera JSON; em quota/429/403
+ * (ex.: free tier limit: 0) usa fallback. Ver https://ai.google.dev/gemini-api/docs/rate-limits
+ * e billing. GEMINI_STRICT=1 faz estes erros propagarem (falha explícita no CI).
  */
 async function obterCenariosRegistro() {
   if (!isGeminiConfigured()) {
@@ -110,7 +126,7 @@ async function obterCenariosRegistro() {
   } catch (error) {
     if (!isGeminiStrict() && isGeminiQuotaOrRateLimitError(error)) {
       console.warn(
-        "[Gemini] Quota ou limite de taxa; usando CENARIOS_REGISTRO_FALLBACK. Defina GEMINI_STRICT=1 para falhar em 429."
+        "[Gemini] Quota / limite ou modelo indisponível no plano atual — usando CENARIOS_REGISTRO_FALLBACK. Ative faturação ou outro modelo (GEMINI_MODEL). GEMINI_STRICT=1 desliga o fallback."
       );
       return cenariosRegistroFallbackCopia();
     }
