@@ -54,9 +54,9 @@ jobs:
         env:
           REQRES_API_KEY: ${{ secrets.REQRES_API_KEY }}
 
-      # Carga menor no CI (threads/loops via -J); -JreqresApiKey alinha com Playwright (secret REQRES_API_KEY).
+      # Carga mínima no CI: a mesma chave já sofre rate limit no Playwright; 1×1 evita 429 em sequência.
       - name: Executar Teste de Performance (JMeter em modo non-GUI)
-        run: jmeter -n -t performance/load-test.jmx -l performance/results.jtl -Jthreads=5 -Jloops=2 -JreqresApiKey="${REQRES_API_KEY}"
+        run: jmeter -n -t performance/load-test.jmx -l performance/results.jtl -Jthreads=1 -Jloops=1 -Jramp=15 -JreqresApiKey="${REQRES_API_KEY}"
         env:
           REQRES_API_KEY: ${{ secrets.REQRES_API_KEY }}
 
