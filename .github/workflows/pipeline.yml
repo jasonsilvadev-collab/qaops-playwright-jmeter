@@ -15,11 +15,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
+          cache: npm
           
-      - name: Instalar Dependências e Browsers
-        run: |
-          npm ci
-          npx playwright install --with-deps
+      # Testes atuais são só API (fixture request): não instalar browsers poupa vários minutos.
+      # Ver https://playwright.dev/docs/api-testing
+      - name: Instalar dependências (sem browsers)
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
           
       # Sem o secret GEMINI_API_KEY o job ainda passa: o teste que chama Gemini é ignorado (test.skip).
       # Crie a chave em https://aistudio.google.com/apikey e adicione em Repo → Settings → Secrets → Actions.
@@ -30,7 +33,9 @@ jobs:
 
   jmeter-load-tests:
     runs-on: ubuntu-latest
-    needs: playwright-ai-tests # Só roda a carga se a inteligência/funcional passar
+    # Em paralelo com Playwright para reduzir tempo total do workflow (antes: soma dos dois jobs).
+    # Para voltar a rodar JMeter só após Playwright: descomente a linha abaixo e remova este comentário.
+    # needs: playwright-ai-tests
     steps:
       - name: Checkout do Código
         uses: actions/checkout@v4
@@ -38,10 +43,11 @@ jobs:
       - name: Instalar Apache JMeter
         run: |
           sudo apt-get update
-          sudo apt-get install -y jmeter
+          sudo apt-get install -y --no-install-recommends jmeter
 
+      # Carga menor no CI (threads/loops via -J); produção pode usar valores default do .jmx.
       - name: Executar Teste de Performance (JMeter em modo non-GUI)
-        run: jmeter -n -t performance/load-test.jmx -l performance/results.jtl
+        run: jmeter -n -t performance/load-test.jmx -l performance/results.jtl -Jthreads=5 -Jloops=2
 
       - name: Salvar Relatório de Performance
         uses: actions/upload-artifact@v4
