@@ -21,6 +21,8 @@ jobs:
           npm ci
           npx playwright install --with-deps
           
+      # Sem o secret GEMINI_API_KEY o job ainda passa: o teste que chama Gemini é ignorado (test.skip).
+      # Crie a chave em https://aistudio.google.com/apikey e adicione em Repo → Settings → Secrets → Actions.
       - name: Executar Playwright + Gemini
         run: npx playwright test
         env:

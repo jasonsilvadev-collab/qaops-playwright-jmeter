@@ -1,10 +1,14 @@
 const { test, expect } = require('@playwright/test');
-const { gerarMassaDeDadosRegistro } = require('../../utils/ai-helper');
+const { gerarMassaDeDadosRegistro, isGeminiConfigured } = require('../../utils/ai-helper');
 
 test.describe('API - Fluxo de Registro guiado por Google Gemini', () => {
 
   test('Deve testar dinamicamente os cenários de IA na API reqres.in', async ({ request }) => {
-    
+    test.skip(
+      !isGeminiConfigured(),
+      'GEMINI_API_KEY não definida: defina no .env ou no secret GEMINI_API_KEY no GitHub Actions (403 sem chave).'
+    );
+
     // 1. Pede à IA para inventar os dados de teste
     const cenariosGerados = await gerarMassaDeDadosRegistro();
     expect(cenariosGerados.length).toBeGreaterThan(0);

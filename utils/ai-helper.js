@@ -1,12 +1,36 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 require("dotenv").config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+function getGeminiApiKey() {
+  const key = process.env.GEMINI_API_KEY?.trim();
+  return key || "";
+}
+
+/** True when GEMINI_API_KEY is set (local .env or CI secret). */
+function isGeminiConfigured() {
+  return Boolean(getGeminiApiKey());
+}
+
+function createGenAI() {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY ausente. Local: defina em .env. CI: Settings → Secrets → Actions → GEMINI_API_KEY (chave em https://aistudio.google.com/apikey)."
+    );
+  }
+  return new GoogleGenerativeAI(apiKey);
+}
+
+/** IDs válidos mudam no tempo; override opcional via GEMINI_MODEL. */
+function getGeminiModelId() {
+  const id = process.env.GEMINI_MODEL?.trim();
+  return id || "gemini-2.0-flash";
+}
 
 async function gerarMassaDeDadosRegistro() {
   try {
-    // Usamos o modelo flash-latest para evitar o erro 404
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    const genAI = createGenAI();
+    const model = genAI.getGenerativeModel({ model: getGeminiModelId() });
 
     const prompt = `Você é um QA Engineer Sênior. Retorne APENAS um array JSON válido.
     Gere 3 cenários de teste de borda para uma API de Registro. A API exige e-mails válidos (ex: 'eve.holt@reqres.in'). 
@@ -25,4 +49,4 @@ async function gerarMassaDeDadosRegistro() {
   }
 }
 
-module.exports = { gerarMassaDeDadosRegistro };
+module.exports = { gerarMassaDeDadosRegistro, isGeminiConfigured };
