@@ -34,9 +34,8 @@ jobs:
 
   jmeter-load-tests:
     runs-on: ubuntu-latest
-    # Em paralelo com Playwright para reduzir tempo total do workflow (antes: soma dos dois jobs).
-    # Para voltar a rodar JMeter só após Playwright: descomente a linha abaixo e remova este comentário.
-    # needs: playwright-ai-tests
+    # Depois do Playwright: os dois usam a mesma REQRES_API_KEY — em paralelo gerava 429 no /api/register.
+    needs: playwright-ai-tests
     steps:
       - name: Checkout do Código
         uses: actions/checkout@v4
