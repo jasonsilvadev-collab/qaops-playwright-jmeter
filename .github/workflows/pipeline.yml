@@ -1,0 +1,49 @@
+name: QAOps - Playwright, JMeter & Google AI
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  playwright-ai-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Código
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          
+      - name: Instalar Dependências e Browsers
+        run: |
+          npm ci
+          npx playwright install --with-deps
+          
+      - name: Executar Playwright + Gemini
+        run: npx playwright test
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+  jmeter-load-tests:
+    runs-on: ubuntu-latest
+    needs: playwright-ai-tests # Só roda a carga se a inteligência/funcional passar
+    steps:
+      - name: Checkout do Código
+        uses: actions/checkout@v4
+
+      - name: Instalar Apache JMeter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jmeter
+
+      - name: Executar Teste de Performance (JMeter em modo non-GUI)
+        run: jmeter -n -t performance/load-test.jmx -l performance/results.jtl
+
+      - name: Salvar Relatório de Performance
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jmeter-results
+          path: performance/results.jtl
